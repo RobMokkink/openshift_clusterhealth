@@ -1,0 +1,57 @@
+---
+- name: Get openshift version raw
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ ocp_cluster_kubeconfig }}"
+    api_version: config.openshift.io/v1
+    kind: ClusterVersion
+  register: ocp_get_version
+
+- name: Version query
+  set_fact:
+    version_query: "resources[*].status.desired.version"
+
+- name: Get full version of openshift and convert it to a string
+  set_fact:
+    # yamllint disable-line
+    ocp_full_version: "{{ ocp_get_version | json_query(version_query) | join() }}"
+
+- name: Create Current OCP major version
+  set_fact:
+    ocp_cluster_current_major_version: "{{ ocp_full_version.split('.')[0] }}"
+
+- name: Create Current OCP minor version
+  set_fact:
+    ocp_cluster_current_minor_version: "{{ ocp_full_version.split('.')[1] }}"
+
+- name: Get RedHat CatalogSource
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ ocp_cluster_kubeconfig }}"
+    kind: CatalogSource
+    api_version: operators.coreos.com/v1alpha1
+    namespace: "{{ ocp_clustertest_marketplace_namespace }}"
+    name: "{{ ocp_clustertest_catalogsource_name }}"
+  register: ocp_clustertest_catalogsource
+
+
+- name: Extract image from CatalogSource
+  set_fact:
+    ocp_clustertest_catalogsource_version: "{{ ocp_clustertest_catalogsource | json_query(image_query) | join() }}"
+  vars:
+    image_query: "resources[*].spec.image"
+
+
+- name: Extract version from image
+  set_fact:
+    ocp_clustertest_catalogsource_version: "{{ ocp_clustertest_catalogsource_version | regex_search('[0-9]+.[0-9]+') }}"
+
+- name: Split version in major and minor
+  set_fact:
+    ocp_clustertest_catalogsource_major_version: "{{ ocp_clustertest_catalogsource_version.split('.')[0] }}"
+    ocp_clustertest_catalogsource_minor_version: "{{ ocp_clustertest_catalogsource_version.split('.')[1] }}"
+
+- name: Check cluster version and olm version.
+  fail:
+    msg: "OLM version mismatch ClusterVersion: {{ocp_cluster_current_major_version}}.{{ ocp_cluster_current_minor_version }} CatalogImageVersion: {{ ocp_clustertest_catalogsource_major_version }}.{{ ocp_clustertest_catalogsource_minor_version }}"
+  when:
+    - ocp_clustertest_catalogsource_major_version != ocp_cluster_current_major_version
+    - ocp_clustertest_catalogsource_minor_version != ocp_cluster_current_minor_version

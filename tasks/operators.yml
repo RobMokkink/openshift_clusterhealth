@@ -1,0 +1,57 @@
+---
+- name: Get all cluster operators
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ ocp_cluster_kubeconfig }}"
+    api_version: config.openshift.io/v1
+    kind: ClusterOperator
+  register: cluster_operators
+
+- name: Check if the are operator who are in state Degraded
+  fail:
+    msg: "Operator {{ item.metadata.name }} degraded"
+  loop: "{{ cluster_operators.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  vars:
+    - co_status: "status.conditions[?type=='Degraded'].status"
+  when: item | json_query(co_status) | join() | bool
+
+- name: Check if the are operator matches the openshift version
+  fail:
+    msg: "Operator {{ item.metadata.name }} does
+         not match the openshift version"
+  loop: "{{ cluster_operators.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  vars:
+    - co_version: "status.versions[?(@.name=='operator')].version"
+  when: item | json_query(co_version) | join() != ocp_version
+
+- name: Get subscriptions
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ ocp_cluster_kubeconfig }}"
+    api_version: operators.coreos.com/v1alpha1
+    kind: Subscription
+  register: all_subs
+
+- name: Check CatalogSource Health
+  fail:
+    msg: "Subscription {{ item.metadata.name }} in namespace:
+        {{ item.metadata.namespace }} has unhealthy catalog"
+  loop: "{{ all_subs.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  vars:
+    - sub_catalog: 'status.conditions[?(@.type=="CatalogSourcesUnhealthy")].status'
+  when: item | json_query(sub_catalog) | join() | bool
+
+- name: Check if subscription is up2date
+  fail:
+    msg: "Subscription {{ item.metadata.name }} in namespace:
+        {{ item.metadata.namespace }} is not up2date"
+  loop: "{{ all_subs.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when: (item.status.state is defined and
+         item.status.state != "AtLatestKnown"
+         and item.spec.installPlanApproval != "Manual")

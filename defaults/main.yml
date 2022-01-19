@@ -1,0 +1,6 @@
+---
+ocp_cluster_kubeconfig: ""
+ocp_clustertest_marketplace_namespace: "openshift-marketplace"
+ocp_clustertest_catalogsource_name: "redhat-operators"
+ocp_clustertest_skip_olm: false
+ocp_clustertest_skip_pdb_check: false

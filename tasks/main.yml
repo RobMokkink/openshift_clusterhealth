@@ -1,0 +1,23 @@
+---
+- name: Run version check
+  import_tasks: version.yml
+
+- name: Check Operator Health
+  import_tasks: operators.yml
+
+- name: Check node health
+  import_tasks: nodes.yml
+
+- name: Check ETCD health
+  import_tasks: etcd.yml
+
+- name: Run ingress healthcheck
+  import_tasks: ingress.yml
+
+- name: Run OLM healthcheck
+  include_tasks: olm.yml
+  when: not ocp_clustertest_skip_olm|bool
+
+- name: Run PDB check
+  include_tasks: pdb.yml
+  when: not ocp_clustertest_skip_pdb_check|bool

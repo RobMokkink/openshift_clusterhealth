@@ -1,0 +1,17 @@
+---
+- name: Get ingress pods
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ ocp_cluster_kubeconfig }}"
+    api_version: v1
+    kind: Pod
+    namespace: openshift-ingress
+  register: cluster_ingress_pods
+
+- name: Check if ingress pods are running
+  fail:
+    msg: "Ingress pod {{ item.metadata.name }} is not running
+         in {{ item.metadata.namespace }}"
+  loop: "{{ cluster_ingress_pods.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  when: item.status.phase != "Running"

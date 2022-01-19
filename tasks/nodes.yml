@@ -1,0 +1,17 @@
+---
+- name: Get all cluster nodes
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ ocp_cluster_kubeconfig }}"
+    api_version: v1
+    kind: Node
+  register: cluster_nodes
+
+- name: Check if the nodes are in Ready state
+  fail:
+    msg: "Node {{ item.metadata.name }} is not Ready"
+  loop: "{{ cluster_nodes.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
+  vars:
+    - co_status: "status.conditions[?type=='Ready'].status"
+  when: not item | json_query(co_status) | join() | bool

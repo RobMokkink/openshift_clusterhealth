@@ -1,0 +1,25 @@
+---
+- name: Get openshift version
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ ocp_cluster_kubeconfig }}"
+    api_version: config.openshift.io/v1
+    kind: ClusterVersion
+    validate_certs: false
+  register: ocp_cluster_version
+
+- name: Set openshift version fact
+  set_fact:
+    ocp_version: "{{ ocp_cluster_version | json_query(version_query) | join() }}"
+  vars:
+    - version_query: "resources[*].status.desired.version"
+
+- name: Give output of cluster version
+  debug:
+    msg: "Openshift version is: {{ ocp_version }}"
+
+- name: Check if upgrade is running
+  fail:
+    msg: "Upgrade is busy"
+  when: not ocp_cluster_version | json_query(upgrade_status)
+  vars:
+    - upgrade_status: 'resources[*].status.conditions[?(@.type=="Progressing")].status'

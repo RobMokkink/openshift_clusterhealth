@@ -1,0 +1,16 @@
+---
+- name: Get etcd status
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ ocp_cluster_kubeconfig }}"
+    api_version: operator.openshift.io/v1
+    kind: Etcd
+    name: cluster
+  register: cluster_etcd
+
+- name: Check if etcd is healthy
+  fail:
+    msg: "Etcd is broken"
+  vars:
+    - etcd_status: "resources[*].status.conditions[?type=='EtcdMembersAvailable'].status"
+  when:
+    - not cluster_etcd | json_query(etcd_status) | flatten | first | bool

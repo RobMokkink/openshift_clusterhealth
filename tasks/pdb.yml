@@ -1,0 +1,19 @@
+---
+- name: Get PodDisruptionBudgets
+  kubernetes.core.k8s_info:
+    kubeconfig: "{{ ocp_cluster_kubeconfig }}"
+    api_version: policy/v1beta1
+    kind: PodDisruptionBudget
+  register: all_pdbs
+
+- name: Get PodDisruptionBudgetAllowed status
+  set_fact:
+    pdb_astatus: "{{ all_pdbs | json_query('resources[*].status.disruptionsAllowed') }}"
+
+- name: "Check which PodDisruptionBudgetAllowed is zero"
+  fail:
+    msg: "PodDisruptionBudget {{ item | json_query('metadata.name') }} is zero"
+  when: item | json_query('status.disruptionsAllowed') < 1
+  loop: "{{ all_pdbs.resources }}"
+  loop_control:
+    label: "{{ item.metadata.name }}"
